@@ -98,10 +98,16 @@ export type ClearCanvasAction = {
   type: "clearCanvas";
 };
 
+export type UndoRedoAction = {
+  type: "undoRedo";
+  elements: Array<Element>;
+};
+
 export type WebSocketMessage = 
   | DrawAction 
   | CursorAction 
   | UserJoinAction 
   | UserLeaveAction
   | LoadSessionAction
-  | ClearCanvasAction;
+  | ClearCanvasAction
+  | UndoRedoAction;

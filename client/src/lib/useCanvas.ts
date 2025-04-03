@@ -25,7 +25,6 @@ export function useCanvas() {
     
     switch (type) {
       case 'pen':
-      case 'eraser':
         if (points && points.length > 0) {
           ctx.beginPath();
           ctx.moveTo(points[0].x, points[0].y);
@@ -35,6 +34,28 @@ export function useCanvas() {
           }
           
           ctx.stroke();
+        }
+        break;
+        
+      case 'eraser':
+        if (points && points.length > 0) {
+          // Save current context state
+          ctx.save();
+          
+          // Set composite operation to destination-out to erase
+          ctx.globalCompositeOperation = 'destination-out';
+          
+          ctx.beginPath();
+          ctx.moveTo(points[0].x, points[0].y);
+          
+          for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+          }
+          
+          ctx.stroke();
+          
+          // Restore context to previous state
+          ctx.restore();
         }
         break;
         

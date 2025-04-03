@@ -21,6 +21,10 @@ export default function Whiteboard() {
   const [currentColor, setCurrentColor] = useState<string>("#000000");
   const [strokeWidth, setStrokeWidth] = useState<number>(3);
   const [elements, setElements] = useState<Element[]>([]);
+  // Undo/Redo history
+  const [history, setHistory] = useState<Element[][]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number>(-1);
+  // Multi-user state
   const [activeUsers, setActiveUsers] = useState<any[]>([]);
   const [userCursors, setUserCursors] = useState<Record<string, { x: number; y: number; color: string; username: string }>>({});
   const [isSessionModalOpen, setIsSessionModalOpen] = useState<boolean>(false);
@@ -98,15 +102,28 @@ export default function Whiteboard() {
         case 'loadSession':
           // Load session elements
           setElements(data.elements);
+          // Reset history
+          setHistory([data.elements]);
+          setHistoryIndex(0);
           break;
           
         case 'clearCanvas':
           // Clear all elements
           setElements([]);
+          // Add empty state to history
+          setHistory(prev => [...prev, []]);
+          setHistoryIndex(prev => prev + 1);
+          
           toast({
             title: "Canvas Cleared",
             description: "All elements have been cleared from the canvas",
           });
+          break;
+          
+        case 'undoRedo':
+          // Update canvas state from undo/redo action by other user
+          setElements(data.elements);
+          // We don't update our history here as this is someone else's action
           break;
           
         default:
@@ -156,13 +173,55 @@ export default function Whiteboard() {
     }
   };
   
-  // Handle element addition
+  // Add to history when elements change
+  useEffect(() => {
+    // Don't update history for initial load or when manually handling history
+    if (elements.length > 0 && historyIndex === history.length - 1) {
+      setHistory(prev => [...prev.slice(0, historyIndex + 1), elements]);
+      setHistoryIndex(prev => prev + 1);
+    }
+  }, [elements, history, historyIndex]);
+
+  // Handle element addition with history tracking
   const handleAddElement = (element: Element) => {
+    // Add element to canvas
     setElements(prev => [...prev, element]);
+    
+    // Send to other users
     sendMessage(JSON.stringify({
       type: 'draw',
       element
     }));
+  };
+  
+  // Handle undo action
+  const handleUndo = () => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1;
+      setHistoryIndex(newIndex);
+      setElements(history[newIndex]);
+      
+      // Notify other users about undo
+      sendMessage(JSON.stringify({
+        type: 'undoRedo',
+        elements: history[newIndex]
+      }));
+    }
+  };
+  
+  // Handle redo action
+  const handleRedo = () => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1;
+      setHistoryIndex(newIndex);
+      setElements(history[newIndex]);
+      
+      // Notify other users about redo
+      sendMessage(JSON.stringify({
+        type: 'undoRedo',
+        elements: history[newIndex]
+      }));
+    }
   };
   
   // Handle session load/save modal
@@ -205,6 +264,10 @@ export default function Whiteboard() {
           currentTool={currentTool}
           onToolSelect={handleToolSelect}
           onClearCanvas={handleClearCanvas}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={historyIndex > 0}
+          canRedo={historyIndex < history.length - 1}
         />
         
         <Canvas 

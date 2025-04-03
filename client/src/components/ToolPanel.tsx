@@ -6,9 +6,21 @@ interface ToolPanelProps {
   currentTool: DrawingTool;
   onToolSelect: (tool: DrawingTool) => void;
   onClearCanvas: () => void;
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
-export default function ToolPanel({ currentTool, onToolSelect, onClearCanvas }: ToolPanelProps) {
+export default function ToolPanel({ 
+  currentTool, 
+  onToolSelect, 
+  onClearCanvas,
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false
+}: ToolPanelProps) {
   const ToolButton = ({ tool, icon, title }: { tool: DrawingTool; icon: React.ReactNode; title: string }) => (
     <Button
       variant="ghost"
@@ -105,7 +117,8 @@ export default function ToolPanel({ currentTool, onToolSelect, onClearCanvas }: 
           size="icon"
           className="w-10 h-10 rounded-md flex items-center justify-center"
           title="Undo"
-          disabled={true} // To be implemented
+          disabled={!canUndo || !onUndo}
+          onClick={onUndo}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
@@ -117,7 +130,8 @@ export default function ToolPanel({ currentTool, onToolSelect, onClearCanvas }: 
           size="icon"
           className="w-10 h-10 rounded-md flex items-center justify-center"
           title="Redo"
-          disabled={true} // To be implemented
+          disabled={!canRedo || !onRedo}
+          onClick={onRedo}
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path>

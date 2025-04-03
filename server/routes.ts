@@ -129,6 +129,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
             broadcastToAll(message);
             break;
             
+          case 'undoRedo':
+            // Broadcast undo/redo state to all other users
+            broadcastToAllExcept(userId, message);
+            break;
+            
           default:
             console.log('Unknown message type:', message);
         }
