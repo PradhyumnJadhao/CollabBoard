@@ -110,9 +110,12 @@ export default function Whiteboard() {
         case 'clearCanvas':
           // Clear all elements
           setElements([]);
-          // Add empty state to history
-          setHistory(prev => [...prev, []]);
-          setHistoryIndex(prev => prev + 1);
+          
+          // Add empty state to history directly
+          // This prevents duplicate history entries
+          const newHistory = [...history.slice(0, historyIndex + 1), []];
+          setHistory(newHistory);
+          setHistoryIndex(newHistory.length - 1);
           
           toast({
             title: "Canvas Cleared",
@@ -161,8 +164,22 @@ export default function Whiteboard() {
       await fetch(`/api/sessions/${sessionId}/elements`, {
         method: 'DELETE',
       });
+      
+      // Clear elements on canvas
       setElements([]);
+      
+      // Directly update history to prevent double history entries
+      const newHistory = [...history.slice(0, historyIndex + 1), []];
+      setHistory(newHistory);
+      setHistoryIndex(newHistory.length - 1);
+      
+      // Notify other users
       sendMessage(JSON.stringify({ type: 'clearCanvas' }));
+      
+      toast({
+        title: "Canvas Cleared",
+        description: "All elements have been removed from the whiteboard",
+      });
     } catch (error) {
       console.error('Error clearing canvas:', error);
       toast({
@@ -175,8 +192,26 @@ export default function Whiteboard() {
   
   // Add to history when elements change
   useEffect(() => {
-    // Don't update history for initial load or when manually handling history
-    if (elements.length > 0 && historyIndex === history.length - 1) {
+    // Only add to history if we're not in the middle of an undo/redo or other operation
+    // and the elements have actually changed from the last history state
+    
+    // Skip if this is the first time or history is empty
+    if (history.length === 0) {
+      setHistory([elements]);
+      setHistoryIndex(0);
+      return;
+    }
+    
+    // Skip if we're in the middle of a history operation
+    if (historyIndex !== history.length - 1) {
+      return;
+    }
+    
+    // Don't add duplicate entries to history (for same elements state)
+    const currentHistoryState = JSON.stringify(history[historyIndex]);
+    const newState = JSON.stringify(elements);
+    
+    if (currentHistoryState !== newState) {
       setHistory(prev => [...prev.slice(0, historyIndex + 1), elements]);
       setHistoryIndex(prev => prev + 1);
     }
