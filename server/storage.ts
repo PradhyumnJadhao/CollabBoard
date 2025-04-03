@@ -61,7 +61,13 @@ export class MemStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const id = this.userIdCounter++;
-    const user: User = { ...insertUser, id };
+    const user: User = { 
+      id,
+      username: insertUser.username,
+      password: insertUser.password,
+      color: insertUser.color || "#" + Math.floor(Math.random()*16777215).toString(16),
+      initials: insertUser.initials || insertUser.username.substring(0, 2).toUpperCase()
+    };
     this.users.set(id, user);
     return user;
   }
@@ -111,9 +117,14 @@ export class MemStorage implements IStorage {
   async createElement(insertElement: InsertElement): Promise<Element> {
     const id = this.elementIdCounter++;
     const element: Element = { 
-      ...insertElement, 
       id,
-      createdAt: new Date()
+      type: insertElement.type,
+      color: insertElement.color,
+      width: insertElement.width,
+      data: insertElement.data,
+      sessionId: insertElement.sessionId,
+      createdAt: new Date(),
+      createdBy: insertElement.createdBy === undefined ? null : insertElement.createdBy
     };
     this.elements.set(id, element);
     return element;
@@ -129,4 +140,8 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// Import our PostgreSQL storage implementation
+import { PgStorage } from "./pgStorage";
+
+// Use PostgreSQL storage instead of in-memory storage
+export const storage = new PgStorage();
