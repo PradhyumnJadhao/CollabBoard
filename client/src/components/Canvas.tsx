@@ -1,8 +1,9 @@
 import { useRef, useEffect, useState } from "react";
 import { useCanvas } from "@/lib/useCanvas";
-import { Element, DrawingTool } from "@/types/canvas";
+import { Element, DrawingTool, Point } from "@/types/canvas";
 import UserCursor from "@/components/UserCursor";
 import ColorPicker from "@/components/ColorPicker";
+import TextEditor from "@/components/TextEditor";
 
 interface CanvasProps {
   elements: Element[];
@@ -32,6 +33,12 @@ export default function Canvas({
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentElement, setCurrentElement] = useState<Element | null>(null);
   const [zoomLevel, setZoomLevel] = useState(100);
+  
+  // Text editor state
+  const [showTextEditor, setShowTextEditor] = useState(false);
+  const [textEditorPosition, setTextEditorPosition] = useState<Point>({ x: 0, y: 0 });
+  const [textEditorContent, setTextEditorContent] = useState('');
+  const [editingTextElement, setEditingTextElement] = useState<Element | null>(null);
   
   // Create a unique canvas ID for rendering
   const canvasId = useRef(`canvas-${Date.now()}`);
@@ -87,12 +94,130 @@ export default function Canvas({
   }, [elements, drawElements]);
   
   // Mouse event handlers
+  // Function to handle text operations
+  const handleTextOperation = (text: string) => {
+    if (editingTextElement) {
+      // Update existing text element
+      const updatedElement = {
+        ...editingTextElement,
+        data: { ...editingTextElement.data, text }
+      };
+      
+      // Replace the element in the array
+      const updatedElements = elements.map(el => 
+        el.id === editingTextElement.id ? updatedElement : el
+      );
+      
+      // Send update to server
+      sendMessage(JSON.stringify({
+        type: 'draw',
+        element: updatedElement
+      }));
+      
+      // Close the editor
+      setShowTextEditor(false);
+      setEditingTextElement(null);
+    } else if (textEditorPosition) {
+      // Create a new text element
+      const newTextElement: Element = {
+        id: `element-${Date.now()}`,
+        type: 'text',
+        points: [textEditorPosition],
+        color: currentColor,
+        width: strokeWidth,
+        data: { text }
+      };
+      
+      // Add the element
+      onAddElement(newTextElement);
+      
+      // Close the editor
+      setShowTextEditor(false);
+    }
+  };
+
+  // Function to delete a text element
+  const handleDeleteText = () => {
+    if (editingTextElement) {
+      // Remove the element from the array
+      const updatedElements = elements.filter(el => el.id !== editingTextElement.id);
+      
+      // Send delete message to server (using clearCanvas as a workaround)
+      sendMessage(JSON.stringify({
+        type: 'clearCanvas'
+      }));
+      
+      // Send all remaining elements
+      updatedElements.forEach(element => {
+        sendMessage(JSON.stringify({
+          type: 'draw',
+          element
+        }));
+      });
+      
+      // Close the editor
+      setShowTextEditor(false);
+      setEditingTextElement(null);
+    }
+  };
+  
+  // Function to find if a text element was clicked
+  const findTextElementAtPosition = (x: number, y: number): Element | null => {
+    // Search for text elements that are near the clicked position
+    // We do this in reverse order so we get the topmost element
+    for (let i = elements.length - 1; i >= 0; i--) {
+      const element = elements[i];
+      if (element.type === 'text' && element.points && element.points.length > 0) {
+        const textX = element.points[0].x;
+        const textY = element.points[0].y;
+        
+        // Get text metrics (approximate)
+        const text = element.data.text || '';
+        const fontSize = element.width * 5;
+        const textWidth = text.length * fontSize * 0.6; // Rough estimate
+        
+        // Check if within a reasonable area around the text
+        if (
+          x >= textX - 5 && 
+          x <= textX + textWidth + 5 && 
+          y >= textY - fontSize - 5 && 
+          y <= textY + 5
+        ) {
+          return element;
+        }
+      }
+    }
+    return null;
+  };
+
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (canvasRef.current) {
       const canvas = canvasRef.current;
       const rect = canvas.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
+      
+      // Check if we're clicking on a text element when in select mode
+      if (currentTool === 'select') {
+        const textElement = findTextElementAtPosition(x, y);
+        if (textElement) {
+          // Open the text editor for this element
+          setEditingTextElement(textElement);
+          setTextEditorPosition(textElement.points![0]);
+          setTextEditorContent(textElement.data.text || '');
+          setShowTextEditor(true);
+          return;
+        }
+      }
+      
+      // Handle text tool clicks by opening the text editor
+      if (currentTool === 'text') {
+        setTextEditorPosition({ x, y });
+        setTextEditorContent('');
+        setEditingTextElement(null);
+        setShowTextEditor(true);
+        return;
+      }
       
       setIsDrawing(true);
       
@@ -141,20 +266,6 @@ export default function Canvas({
             color: currentColor,
             width: strokeWidth,
             data: {}
-          };
-          break;
-          
-        case 'text':
-          const textContent = prompt('Enter text:', '');
-          if (!textContent) return; // Cancel if no text entered
-          
-          newElement = {
-            id: `element-${Date.now()}`,
-            type: 'text',
-            points: [{ x, y }],
-            color: currentColor,
-            width: strokeWidth,
-            data: { text: textContent }
           };
           break;
           
@@ -324,6 +435,20 @@ export default function Canvas({
           username={cursor.username}
         />
       ))}
+      
+      {/* Text Editor */}
+      {showTextEditor && (
+        <TextEditor
+          position={textEditorPosition}
+          initialText={textEditorContent}
+          color={editingTextElement ? editingTextElement.color : currentColor}
+          fontSize={editingTextElement ? editingTextElement.width : strokeWidth}
+          onSave={handleTextOperation}
+          onCancel={() => setShowTextEditor(false)}
+          onDelete={editingTextElement ? handleDeleteText : undefined}
+          isEditing={!!editingTextElement}
+        />
+      )}
       
       {/* Floating Controls */}
       <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 bg-white rounded-lg shadow-lg p-3 flex items-center space-x-4">
