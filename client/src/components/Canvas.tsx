@@ -145,14 +145,16 @@ export default function Canvas({
           break;
           
         case 'text':
-          // Not fully implemented
+          const textContent = prompt('Enter text:', '');
+          if (!textContent) return; // Cancel if no text entered
+          
           newElement = {
             id: `element-${Date.now()}`,
             type: 'text',
             points: [{ x, y }],
             color: currentColor,
             width: strokeWidth,
-            data: { text: 'Text' }
+            data: { text: textContent }
           };
           break;
           
@@ -208,6 +210,10 @@ export default function Canvas({
               newElement.points[1] = { x, y };
             }
             break;
+          
+          case 'text':
+            // For text elements, we don't update positions during mousemove
+            return;
             
           default:
             break;
