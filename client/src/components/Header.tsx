@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
@@ -22,6 +22,7 @@ interface HeaderProps {
 export default function Header({ sessionName, sessionId, activeUsers, onOpenLoadSession }: HeaderProps) {
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [newSessionName, setNewSessionName] = useState(sessionName);
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
 
   const handleRenameSession = async () => {
@@ -66,6 +67,33 @@ export default function Header({ sessionName, sessionId, activeUsers, onOpenLoad
           variant: "destructive",
         });
       });
+  };
+  
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/logout', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      if (response.ok) {
+        toast({
+          title: "Logged out",
+          description: "You have been successfully logged out."
+        });
+        setLocation('/auth');
+      } else {
+        throw new Error('Logout failed');
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   return (
@@ -138,6 +166,29 @@ export default function Header({ sessionName, sessionId, activeUsers, onOpenLoad
           
           {/* User Indicator and Share */}
           <div className="flex items-center gap-3">
+            {/* Logout Button */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="rounded-full px-4 flex gap-2 shadow-sm border-red-200 text-red-600 hover:bg-red-50"
+                    onClick={handleLogout}
+                  >
+                    <span className="hidden md:inline">Logout</span>
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"></path>
+                    </svg>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  <p>Log out from your account</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            
+            {/* Share Button */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>

@@ -32,7 +32,7 @@ export default function SessionModal({ onClose, onLoadSession }: SessionModalPro
   };
 
   // Format date to a more readable format
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: Date | string) => {
     const date = new Date(dateString);
     const now = new Date();
     

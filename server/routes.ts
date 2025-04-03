@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { nanoid } from "nanoid";
 import { storage } from "./storage";
+import { setupAuth } from "./auth";
 import { 
   insertSessionSchema, 
   insertElementSchema,
@@ -20,6 +21,9 @@ type ActiveUser = {
 };
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Set up authentication
+  setupAuth(app);
+
   const httpServer = createServer(app);
   
   // Initialize WebSocket server
@@ -198,8 +202,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   }
   
-  // API Routes
-  app.get('/api/sessions', async (req, res) => {
+  // API Routes with authentication middleware
+  // Middleware to check if user is authenticated
+  const isAuthenticated = (req: any, res: any, next: any) => {
+    if (req.isAuthenticated()) {
+      return next();
+    }
+    res.status(401).json({ message: "Unauthorized" });
+  };
+
+  app.get('/api/sessions', isAuthenticated, async (req, res) => {
     try {
       const sessions = await storage.getSessions();
       res.json(sessions);
@@ -208,7 +220,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post('/api/sessions', async (req, res) => {
+  app.post('/api/sessions', isAuthenticated, async (req, res) => {
     try {
       const sessionData = insertSessionSchema.parse(req.body);
       const session = await storage.createSession(sessionData);
@@ -222,7 +234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.put('/api/sessions/:id', async (req, res) => {
+  app.put('/api/sessions/:id', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const { name } = req.body;
@@ -242,7 +254,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.get('/api/sessions/:id/elements', async (req, res) => {
+  app.get('/api/sessions/:id/elements', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const elements = await storage.getElements(id);
@@ -252,7 +264,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.post('/api/sessions/:id/load', async (req, res) => {
+  app.post('/api/sessions/:id/load', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       const session = await storage.getSession(id);
@@ -277,7 +289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
-  app.delete('/api/sessions/:id/elements', async (req, res) => {
+  app.delete('/api/sessions/:id/elements', isAuthenticated, async (req, res) => {
     try {
       const id = parseInt(req.params.id);
       await storage.clearElements(id);
