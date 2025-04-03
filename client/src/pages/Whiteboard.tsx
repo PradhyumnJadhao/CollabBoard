@@ -49,8 +49,9 @@ export default function Whiteboard() {
       
       switch (data.type) {
         case 'draw':
-          // Add the received element to the canvas
-          setElements(prev => [...prev, data.element]);
+          // Add the received element to the canvas (making a deep copy to avoid reference issues)
+          const newElement = JSON.parse(JSON.stringify(data.element));
+          setElements(prev => [...prev, newElement]);
           break;
           
         case 'cursor':
@@ -100,14 +101,24 @@ export default function Whiteboard() {
           break;
           
         case 'loadSession':
-          // Load session elements
-          setElements(data.elements);
-          // Reset history
-          setHistory([data.elements]);
+          // Set flag to prevent adding this state change to history
+          setIsUndoRedoOperation(true);
+          
+          // Load session elements (deep copy to avoid reference issues)
+          const loadedElements = JSON.parse(JSON.stringify(data.elements));
+          setElements(loadedElements);
+          
+          // Reset history with deep copy
+          setHistory([loadedElements]);
           setHistoryIndex(0);
+          
+          console.log(`Loaded session with ${loadedElements.length} elements`);
           break;
           
         case 'clearCanvas':
+          // Set flag to prevent adding this state change to history automatically
+          setIsUndoRedoOperation(true);
+          
           // Clear all elements
           setElements([]);
           
@@ -124,9 +135,16 @@ export default function Whiteboard() {
           break;
           
         case 'undoRedo':
+          // Set flag to prevent adding this state change to history again
+          setIsUndoRedoOperation(true);
+          
           // Update canvas state from undo/redo action by other user
-          setElements(data.elements);
-          // We don't update our history here as this is someone else's action
+          // Make a deep copy to avoid reference issues
+          const receivedElements = JSON.parse(JSON.stringify(data.elements));
+          setElements(receivedElements);
+          
+          // Log the action
+          console.log('Received undo/redo action from another user');
           break;
           
         default:
@@ -165,6 +183,9 @@ export default function Whiteboard() {
         method: 'DELETE',
       });
       
+      // Set flag to prevent adding this state change to history automatically
+      setIsUndoRedoOperation(true);
+      
       // Clear elements on canvas
       setElements([]);
       
@@ -180,6 +201,8 @@ export default function Whiteboard() {
         title: "Canvas Cleared",
         description: "All elements have been removed from the whiteboard",
       });
+      
+      console.log(`Clear canvas: History length ${newHistory.length}, index ${newHistory.length-1}`);
     } catch (error) {
       console.error('Error clearing canvas:', error);
       toast({
@@ -190,19 +213,26 @@ export default function Whiteboard() {
     }
   };
   
+  // Track if we're in an undo/redo operation to avoid double history entries
+  const [isUndoRedoOperation, setIsUndoRedoOperation] = useState(false);
+  
   // Add to history when elements change
   useEffect(() => {
-    // Only add to history if we're not in the middle of an undo/redo or other operation
-    // and the elements have actually changed from the last history state
+    // Skip if we're in the middle of an explicit undo/redo operation
+    if (isUndoRedoOperation) {
+      setIsUndoRedoOperation(false);
+      return;
+    }
     
     // Skip if this is the first time or history is empty
     if (history.length === 0) {
-      setHistory([elements]);
+      // Initialize history with current elements
+      setHistory([JSON.parse(JSON.stringify(elements))]);
       setHistoryIndex(0);
       return;
     }
     
-    // Skip if we're in the middle of a history operation
+    // Skip if user is navigating history (not at the latest point)
     if (historyIndex !== history.length - 1) {
       return;
     }
@@ -212,10 +242,12 @@ export default function Whiteboard() {
     const newState = JSON.stringify(elements);
     
     if (currentHistoryState !== newState) {
-      setHistory(prev => [...prev.slice(0, historyIndex + 1), elements]);
+      // Make a deep copy to ensure history states are fully independent
+      const elementsCopy = JSON.parse(JSON.stringify(elements));
+      setHistory(prev => [...prev.slice(0, historyIndex + 1), elementsCopy]);
       setHistoryIndex(prev => prev + 1);
     }
-  }, [elements, history, historyIndex]);
+  }, [elements, history, historyIndex, isUndoRedoOperation]);
 
   // Handle element addition with history tracking
   const handleAddElement = (element: Element) => {
@@ -232,30 +264,46 @@ export default function Whiteboard() {
   // Handle undo action
   const handleUndo = () => {
     if (historyIndex > 0) {
+      // Set flag to prevent adding this state change to history
+      setIsUndoRedoOperation(true);
+      
       const newIndex = historyIndex - 1;
       setHistoryIndex(newIndex);
-      setElements(history[newIndex]);
+      
+      // Make deep copy to avoid reference issues
+      const elementsToRestore = JSON.parse(JSON.stringify(history[newIndex]));
+      setElements(elementsToRestore);
       
       // Notify other users about undo
       sendMessage(JSON.stringify({
         type: 'undoRedo',
-        elements: history[newIndex]
+        elements: elementsToRestore
       }));
+      
+      console.log(`Undo to history index ${newIndex} of ${history.length-1}`);
     }
   };
   
   // Handle redo action
   const handleRedo = () => {
     if (historyIndex < history.length - 1) {
+      // Set flag to prevent adding this state change to history
+      setIsUndoRedoOperation(true);
+      
       const newIndex = historyIndex + 1;
       setHistoryIndex(newIndex);
-      setElements(history[newIndex]);
+      
+      // Make deep copy to avoid reference issues
+      const elementsToRestore = JSON.parse(JSON.stringify(history[newIndex]));
+      setElements(elementsToRestore);
       
       // Notify other users about redo
       sendMessage(JSON.stringify({
         type: 'undoRedo',
-        elements: history[newIndex]
+        elements: elementsToRestore
       }));
+      
+      console.log(`Redo to history index ${newIndex} of ${history.length-1}`);
     }
   };
   
